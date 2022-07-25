@@ -34,8 +34,8 @@ class VirtualPrivateCloud:
         """The availability zones that the subnets are in"""
 
         self.vpc: aws.ec2.Vpc = aws.ec2.Vpc(
-            f"{resource_name}-vpc",
-            cidr_block=["10.0.0.0/16"],
+            f"{resource_name}_vpc",
+            cidr_block="10.0.0.0/16",
             enable_dns_hostnames=True,
             tags={"Name": "VPC from pulumi"},
         )
@@ -53,7 +53,7 @@ class VirtualPrivateCloud:
                 f"{resource_name}-public-subnet-{idx}",
                 availability_zone=zone,
                 vpc_id=self.vpc.id,
-                cidr_block=[f"10.0.{idx*2+1}.0/24"],
+                cidr_block=f"10.0.{idx*2+1}.0/24",
             )
             for idx, zone in enumerate(AVAILABILITY_ZONES)
         ]
@@ -64,7 +64,7 @@ class VirtualPrivateCloud:
                 f"{resource_name}-private-subnet-{idx}",
                 availability_zone=zone,
                 vpc_id=self.vpc.id,
-                cidr_block=[f"10.0.{idx*2+2}.0/24"],
+                cidr_block=f"10.0.{idx*2+2}.0/24",
             )
             for idx, zone in enumerate(AVAILABILITY_ZONES)
         ]
@@ -88,7 +88,7 @@ class VirtualPrivateCloud:
             aws.ec2.RouteTableAssociation(
                 f"{resource_name}-public-rta-{idx}",
                 subnet_id=subnet.id,
-                route_table_id=route_table,
+                route_table_id=route_table.id,
             )
             for idx, subnet, route_table in zip(
                 range(len(self.public_subnets)),
@@ -149,7 +149,7 @@ class VirtualPrivateCloud:
                 vpc_id=self.vpc.id,
                 routes=[
                     aws.ec2.RouteTableRouteArgs(
-                        cidr_block=["0.0.0.0/0"],
+                        cidr_block="0.0.0.0/0",
                         network_interface_id=nat.primary_network_interface_id,
                     )
                 ],
@@ -165,11 +165,9 @@ class VirtualPrivateCloud:
                 route_table_id=route_table.id,
             )
             for idx, subnet, route_table in zip(
-                range(
-                    len(AVAILABILITY_ZONES),
-                    self.private_subnets,
-                    self.private_route_tables,
-                )
+                range(len(AVAILABILITY_ZONES)),
+                self.private_subnets,
+                self.private_route_tables,
             )
         ]
         """The route table associations for the private subnets"""

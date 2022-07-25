@@ -159,7 +159,7 @@ class TransportLayerSecurity:
         self.certificate_validation: aws.acm.CertificateValidation = (
             aws.acm.CertificateValidation(
                 f"{resource_name}-cert-validation",
-                certifiate_arn=self.certificate.arn,
+                certificate_arn=self.certificate.arn,
                 validation_record_fqdns=[
                     record.fqdn for record in self.validation_records
                 ],

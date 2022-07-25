@@ -113,19 +113,17 @@ class Webapp:
         self.security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-security-group",
             description="Allow all traffic",
-            egress=[aws.ec2.SecurityGroupEgressArgs(
-                from_port=0,
-                protocol="-1",
-                to_port=0,
-                cidr_blocks=['0.0.0.0/0']
-            )],
-            ingress=[aws.ec2.SecurityGroupIngressArgs(
-                from_port=0,
-                protocol=-1,
-                to_port=0,
-                cidr_blocks=["0.0.0.0/0"]
-            )],
-            tags={"Name": f"{resource_name} security group"}
+            egress=[
+                aws.ec2.SecurityGroupEgressArgs(
+                    from_port=0, protocol="-1", to_port=0, cidr_blocks=["0.0.0.0/0"]
+                )
+            ],
+            ingress=[
+                aws.ec2.SecurityGroupIngressArgs(
+                    from_port=0, protocol=-1, to_port=0, cidr_blocks=["0.0.0.0/0"]
+                )
+            ],
+            tags={"Name": f"{resource_name} security group"},
         )
         """the security group used for instances"""
 
@@ -142,7 +140,7 @@ class Webapp:
                         "Name": f"{resource_name} {vpc.availability_zones[subnet_idx]}-{instance_idx}"
                     },
                 )
-                for instance_idx in range(len(num_instances_per_subnet))
+                for instance_idx in range(num_instances_per_subnet)
             ]
             for subnet_idx, subnet in enumerate(vpc.private_subnets[:num_subnets])
         ]
@@ -163,6 +161,7 @@ class Webapp:
                             },
                         },
                         host=instance.private_ip,
+                        private_key=key.private_key_path,
                         bastion=bastion,
                         shared_script_name="setup-scripts/shared",
                     ),

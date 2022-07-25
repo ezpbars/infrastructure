@@ -8,6 +8,7 @@ import reverse_proxy
 config = pulumi.Config()
 github_username = config.require("github_username")
 github_pat = config.require_secret("github_pat")
+domain = config.require("domain")
 
 key = Key("key", "key.pub", "key.openssh")
 
@@ -31,7 +32,7 @@ backend_ws = webapp.Webapp(
     key,
 )
 frontend = webapp.Webapp(
-    "frontnd",
+    "frontend",
     main_vpc,
     "ezpbars/frontend",
     github_username,
@@ -41,4 +42,11 @@ frontend = webapp.Webapp(
 )
 main_reverse_proxy = reverse_proxy.ReverseProxy(
     "main_reverse_proxy", main_vpc, key, backend_rest, backend_ws, frontend
+)
+tls = tls.TransportLayerSecurity(
+    "tls",
+    domain,
+    main_vpc.vpc.id,
+    [subnet.id for subnet in main_vpc.public_subnets],
+    [instance.private_ip for instance in main_reverse_proxy.reverse_proxies],
 )

@@ -109,9 +109,13 @@ class ReverseProxy:
                             "FRONTEND_UPSTREAM": get_upstreams(self.frontend),
                         }
                     },
+                    host=instance.private_ip,
+                    private_key=self.vpc.key.private_key_path,
+                    bastion=self.vpc.bastion.public_ip,
+                    shared_script_name="scripts/shared",
                 ),
             )
-            for idx, _ in enumerate(self.reverse_proxies)
+            for idx, instance in enumerate(self.reverse_proxies)
         ]
         """The commands to install and configure nginx on each reverse proxy"""
 
@@ -127,8 +131,10 @@ def get_upstreams(webapp: Webapp) -> pulumi.Input[str]:
     """
     all_instances: List[aws.ec2.Instance] = list(
         itertools.chain(
-            (inst for inst in subnet_insts)
-            for subnet_insts in webapp.instances_by_subnet
+            *[
+                (inst for inst in subnet_insts)
+                for subnet_insts in webapp.instances_by_subnet
+            ]
         )
     )
 
