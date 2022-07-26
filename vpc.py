@@ -3,6 +3,7 @@ from typing import List
 import pulumi
 import pulumi_aws as aws
 from key import Key
+import json
 
 AVAILABILITY_ZONES = ["us-west-2b", "us-west-2c", "us-west-2d"]
 """The availability zones which we use"""
@@ -186,6 +187,7 @@ class VirtualPrivateCloud:
         self.bastion_security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-bastion-security-group",
             description="Allow incoming port 22",
+            vpc_id=self.vpc.id,
             egress=[
                 aws.ec2.SecurityGroupEgressArgs(
                     from_port=0, protocol="-1", to_port=0, cidr_blocks=["0.0.0.0/0"]
@@ -199,6 +201,33 @@ class VirtualPrivateCloud:
             tags={"Name": f"{resource_name} bastion"},
         )
 
+        self.standard_iam_role = aws.iam.Role(
+            f"{resource_name}_standard_iam_role",
+            assume_role_policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Sid": "",
+                            "Principal": {"Service": "ec2.amazonaws.com"},
+                        }
+                    ],
+                }
+            ),
+            tags={
+                "Name": "webapp-iam-role",
+            },
+        )
+        """The standard iam role with no additional permissions"""
+
+        self.standard_instance_profile = aws.iam.InstanceProfile(
+            f"{resource_name}_standard_instance_profile",
+            role=self.standard_iam_role.name,
+        )
+        """The standard instance profile with no additional permissions"""
+
         self.bastion: aws.ec2.Instance = aws.ec2.Instance(
             f"{resource_name}-bastion",
             ami=self.amazon_linux_arm64.id,
@@ -207,6 +236,8 @@ class VirtualPrivateCloud:
             instance_type="t4g.nano",
             key_name=key.key_pair.key_name,
             vpc_security_group_ids=[self.bastion_security_group.id],
+            iam_instance_profile=self.standard_instance_profile.name,
+            tags={"Name": f"{resource_name}-bastion"},
         )
         """The bastion server which can connect to the instances"""
 

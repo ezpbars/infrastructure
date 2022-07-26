@@ -10,10 +10,9 @@ cd webapp
 git init
 git remote add origin "https://${GITHUB_USERNAME}:${GITHUB_PAT}@github.com/${GITHUB_REPOSITORY}"
 git pull origin main
-cd /home/ec2-user
 bash -c "source /home/ec2-user/config.sh && bash scripts/auto/after_install.sh && bash scripts/auto/start.sh"
 cd /home/ec2-user
 crontab -l > cron
-echo "@reboot sudo bash /usr/local/src/webapp/scripts/auto/start.sh" >> cron
+echo "@reboot sudo bash -c 'cd /usr/local/src/webapp && bash scripts/auto/start.sh'" >> cron
 crontab cron
 rm cron

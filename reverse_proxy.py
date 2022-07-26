@@ -2,7 +2,7 @@
 given subnets.
 """
 import itertools
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 import pulumi
 import pulumi_aws as aws
 from key import Key
@@ -55,6 +55,7 @@ class ReverseProxy:
         self.reverse_proxy_security_group: aws.ec2.SecurityGroup = (
             aws.ec2.SecurityGroup(
                 f"{resource_name}-reverse-proxy-security-group",
+                vpc_id=self.vpc.vpc.id,
                 description="Allow inbound port 80 traffic",
                 ingress=[
                     aws.ec2.SecurityGroupIngressArgs(
@@ -91,6 +92,7 @@ class ReverseProxy:
                 subnet_id=subnet.id,
                 vpc_security_group_ids=[self.reverse_proxy_security_group.id],
                 key_name=self.vpc.key.key_pair.key_name,
+                iam_instance_profile=self.vpc.standard_instance_profile.name,
                 tags={"Name": f"{resource_name} reverse proxy {idx}"},
             )
             for idx, subnet in enumerate(self.vpc.private_subnets[:2])
@@ -138,8 +140,8 @@ def get_upstreams(webapp: Webapp) -> pulumi.Input[str]:
         )
     )
 
-    def make_upstream(ip_addresses: Sequence[str]) -> str:
-        return "\n".join(f"server {ip}:80;" for ip in ip_addresses)
+    def make_upstream(ip_addresses: Tuple[Sequence[str]]) -> str:
+        return "\n".join(f"server {ip}:80;" for ip in ip_addresses[0])
 
     return pulumi.Output.all([inst.private_ip for inst in all_instances]).apply(
         make_upstream

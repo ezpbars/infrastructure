@@ -48,5 +48,5 @@ tls = tls.TransportLayerSecurity(
     domain,
     main_vpc.vpc.id,
     [subnet.id for subnet in main_vpc.public_subnets],
-    [instance.private_ip for instance in main_reverse_proxy.reverse_proxies],
+    [instance.id for instance in main_reverse_proxy.reverse_proxies],
 )

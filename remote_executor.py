@@ -3,6 +3,7 @@ upload and execute scripts on remote machines managed by pulumi.
 In particular, this supports the ability to proxy requests through
 a bastion server - a common pattern when using VPCs.
 """
+import traceback
 import pulumi
 import paramiko
 from typing import Optional, TypedDict, Tuple, Dict
@@ -146,17 +147,24 @@ class RemoteExecutionProvider(pulumi.dynamic.ResourceProvider):
     """
 
     def create(self, inputs: _RemoteExecutionInputs) -> pulumi.dynamic.CreateResult:
-        return pulumi.dynamic.CreateResult(
-            id_=secrets.token_hex(16),
-            outs=self.execute_remotely(
-                inputs["script_name"],
-                inputs.get("file_substitutions"),
-                inputs["host"],
-                inputs["private_key"],
-                inputs.get("bastion"),
-                inputs.get("shared_script_name"),
-            ),
-        )
+        id_ = secrets.token_hex(16)
+        try:
+            return pulumi.dynamic.CreateResult(
+                id_=id_,
+                outs=self.execute_remotely(
+                    inputs["script_name"],
+                    inputs.get("file_substitutions"),
+                    inputs["host"],
+                    inputs["private_key"],
+                    inputs.get("bastion"),
+                    inputs.get("shared_script_name"),
+                ),
+            )
+        except:
+            with open(f"remote_execution_error_{id_}.txt", "a") as f_out:
+                print(f"{inputs=}", file=f_out)
+                traceback.print_exc(file=f_out)
+            raise
 
     def delete(self, id: str, olds: _RemoteExecutionOutputs) -> None:
         if not os.path.exists(os.path.join(olds["script_name"], "delete.sh")):
@@ -282,7 +290,7 @@ class RemoteExecutionProvider(pulumi.dynamic.ResourceProvider):
 
         single_file_script_str = single_file_script.getvalue()
 
-        for _ in range(30):
+        for _ in range(150):
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             try:
@@ -377,7 +385,7 @@ class RemoteExecution(pulumi.dynamic.Resource):
 
 
 def exec_simple(
-    client: paramiko.SSHClient, command: str, timeout=5, cmd_timeout=3600
+    client: paramiko.SSHClient, command: str, timeout=15, cmd_timeout=3600
 ) -> Tuple[str, str]:
     """Executes the given command on the paramiko client, waiting for
     the command to finish before returning the stdout and stderr
@@ -388,8 +396,8 @@ def exec_simple(
     stdout = chan.makefile("r", 8192)
     stderr = chan.makefile_stderr("r", 8192)
 
-    all_stdout = io.StringIO()
-    all_stderr = io.StringIO()
+    all_stdout = io.BytesIO()
+    all_stderr = io.BytesIO()
 
     while not chan.exit_status_ready():
         time.sleep(0.1)
@@ -398,18 +406,18 @@ def exec_simple(
         from_stderr = stderr.read(4096)
 
         if from_stdout is not None:
-            all_stdout.write(from_stdout.decode("utf-8"))
+            all_stdout.write(from_stdout)
 
         if from_stderr is not None:
-            all_stderr.write(from_stderr.decode("utf-8"))
+            all_stderr.write(from_stderr)
 
     while from_stdout := stdout.read(4096):
-        all_stdout.write(from_stdout.decode("utf-8"))
+        all_stdout.write(from_stdout)
 
     while from_stderr := stderr.read(4096):
-        all_stderr.write(from_stderr.decode("utf-8"))
+        all_stderr.write(from_stderr)
 
-    return all_stdout.getvalue(), all_stderr.getvalue()
+    return all_stdout.getvalue().decode('utf-8', errors='replace'), all_stderr.getvalue().decode('utf-8', errors='replace')
 
 
 def hash_directory(dirpath: str) -> str:

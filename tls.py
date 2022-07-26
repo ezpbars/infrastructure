@@ -59,6 +59,7 @@ class TransportLayerSecurity:
 
         self.security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-security-group",
+            vpc_id=self.vpc,
             description="ALB security group - allows ingress everywhere from 80/443",
             ingress=[
                 aws.ec2.SecurityGroupIngressArgs(

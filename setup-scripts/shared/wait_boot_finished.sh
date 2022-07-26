@@ -12,8 +12,21 @@ install_basic_dependencies() {
     amazon-linux-extras enable epel=stable
     yum clean metadata
     rpm --rebuilddb
-    yum install -y epel-release git jq
+    yum install -y epel-release git jq screen
     yum update -y
+}
+
+install_latest_python() {
+    local latest_version=$(amazon-linux-extras | grep -oE "python3\.[0-9]+" | grep -oE "3\.[0-9]+" | sort -t '.' -k1,1nr -k2,2nr | head -n 1)
+    amazon-linux-extras enable python$latest_version | tail -n 2 | cut -c 4- | sed 's/yum install/yum -y install/g' > python_install.sh
+    rpm --rebuilddb
+    bash python_install.sh
+    rm python_install.sh
+
+    rm /usr/bin/python3
+    ln -s /usr/bin/python$latest_version /usr/bin/python3
+
+    python3 -m pip install -U pip
 }
 
 verify_iam_profile() {
@@ -31,6 +44,7 @@ wait_iam_profile() {
 
         if (($ctr > 5))
         then
+            echo "iam profile never arrived, giving up on it" >> /home/ec2-user/boot_warnings
             break
         fi
     done
@@ -39,3 +53,4 @@ wait_iam_profile() {
 wait_internet
 install_basic_dependencies
 wait_iam_profile
+install_latest_python

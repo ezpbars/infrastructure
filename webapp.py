@@ -4,6 +4,7 @@ scripts/auto/after_install.sh from the repository, and the application
 is run via the scripts/auto/start.sh
 """
 from typing import List
+from pulumi import ResourceOptions
 import pulumi_aws as aws
 from vpc import VirtualPrivateCloud
 from key import Key
@@ -112,6 +113,7 @@ class Webapp:
 
         self.security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-security-group",
+            vpc_id=self.vpc.vpc.id,
             description="Allow all traffic",
             egress=[
                 aws.ec2.SecurityGroupEgressArgs(
@@ -135,7 +137,9 @@ class Webapp:
                     associate_public_ip_address=False,
                     instance_type=instance_type,
                     subnet_id=subnet.id,
+                    key_name=self.vpc.key.key_pair.key_name,
                     vpc_security_group_ids=[self.security_group.id],
+                    iam_instance_profile=self.vpc.standard_instance_profile.name,
                     tags={
                         "Name": f"{resource_name} {vpc.availability_zones[subnet_idx]}-{instance_idx}"
                     },
@@ -165,6 +169,7 @@ class Webapp:
                         bastion=bastion,
                         shared_script_name="setup-scripts/shared",
                     ),
+                    opts=ResourceOptions(depends_on=self.vpc.private_rtas),
                 )
                 for instance_idx, instance in enumerate(
                     self.instances_by_subnet[subnet_idx]
