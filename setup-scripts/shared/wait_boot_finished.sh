@@ -9,14 +9,25 @@ install_basic_dependencies() {
     yum update -y
     echo "exclude=python3" >> /etc/yum.conf
 
-    amazon-linux-extras enable epel=stable
-    yum clean metadata
-    rpm --rebuilddb
-    yum install -y epel-release git jq screen
-    yum update -y
+    if amazon-linux-extras --help >> /dev/null 2&>1
+    then
+        # amazon linux 2022 has no epel-release yet?
+        amazon-linux-extras enable epel=stable
+        yum clean metadata
+        rpm --rebuilddb
+        yum install -y epel-release git jq screen wget
+        yum update -y
+    else
+        yum install -y git jq screen wget
+    fi
 }
 
 install_latest_python() {
+    if ! amazon-linux-extras --help >> /dev/null 2&>1
+    then
+        # amazon linux 2022 comes with python?
+        return
+    fi
     local latest_version=$(amazon-linux-extras | grep -oE "python3\.[0-9]+" | grep -oE "3\.[0-9]+" | sort -t '.' -k1,1nr -k2,2nr | head -n 1)
     amazon-linux-extras enable python$latest_version | tail -n 2 | cut -c 4- | sed 's/yum install/yum -y install/g' > python_install.sh
     rpm --rebuilddb

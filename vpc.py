@@ -184,6 +184,17 @@ class VirtualPrivateCloud:
         )
         """The preferred arm64 ami"""
 
+        self.amazon_linux_bleeding_arm64 = aws.ec2.get_ami(
+            most_recent=True,
+            filters=[
+                aws.ec2.GetAmiFilterArgs(name="name", values=["al2022-ami-20*"]),
+                aws.ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+                aws.ec2.GetAmiFilterArgs(name="architecture", values=["arm64"]),
+            ],
+            owners=["137112412989"],
+        )
+        """The bleeding edge arm64 ami, for if the preferred one is too out of date"""
+
         self.bastion_security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-bastion-security-group",
             description="Allow incoming port 22",
