@@ -10,7 +10,10 @@ class RqliteCluster:
     """Describes a rqlite cluster with one server on each subnet"""
 
     def __init__(
-        self, resource_name: str, vpc: VirtualPrivateCloud, id_offset: int = 0
+        self,
+        resource_name: str,
+        vpc: VirtualPrivateCloud,
+        id_offset: int = 0,
     ) -> None:
         """Creates a new rqlite cluster running on the private subnets
         of the given virtual private cloud.
@@ -22,14 +25,17 @@ class RqliteCluster:
                 the rqlite cluster within
             id_offset (int): the number of rqlite servers which were once part
                 of this cluster and should no longer be. for example, if you want
-                to cleanly update the cluster seamlessly, increase the id_offset by
-                1 and pulumi up until you have replaced every server
+                to cleanly update the cluster seamlessly, simply increment this by
+                one, up, and repeat until all instances are replaced
         """
         self.resource_name: str = resource_name
         """the resource name prefix to use for resources created by this instance"""
 
         self.vpc: VirtualPrivateCloud = vpc
         """the virtual private cloud the cluster is within"""
+
+        self.id_offset: int = id_offset
+        """the number of rotated out instances"""
 
         self.security_group: aws.ec2.SecurityGroup = aws.ec2.SecurityGroup(
             f"{resource_name}-security-group",
@@ -60,7 +66,10 @@ class RqliteCluster:
         )
 
         self.instance_cluster_ids = list(
-            range(id_offset + 1, id_offset + 1 + len(self.vpc.private_subnets))
+            range(
+                id_offset + 1,
+                id_offset + 1 + len(self.vpc.private_subnets),
+            )
         )
         """The cluster id for each instance, with index-correspondance to instances"""
 
@@ -92,43 +101,44 @@ class RqliteCluster:
         the desired "increment cluster id offset by 1 to swap 1 instance out" behavior
         """
 
-        self.remote_executions: List[RemoteExecution] = [
-            RemoteExecution(
-                f"{resource_name}-remote-execution-{cluster_id}",
-                props=RemoteExecutionInputs(
-                    script_name="setup-scripts/rqlite",
-                    file_substitutions=pulumi.Output.all(
-                        *[i.private_ip for i in self.instances], cluster_id
-                    ).apply(
-                        lambda args: {  # careful - you can't access cluster_id in here reliably
-                            "config.sh": {
-                                "NODE_ID": str(args[-1]),
-                                "MY_IP": args[
-                                    self.instance_cluster_ids.index(args[-1])
-                                ],
-                                "JOIN_ADDRESS": ",".join(
-                                    f"http://{ip}:4001"
-                                    for idx, ip in enumerate(args[:-1])
-                                    if self.instance_cluster_ids[idx] != args[-1]
-                                ),
-                                "DEPROVISION_IP": args[
-                                    (self.instance_cluster_ids.index(args[-1]) + 1)
-                                    % len(self.instances)
-                                ],
-                            }
-                        }
+        self.remote_executions: List[RemoteExecution] = []
+        for cluster_id_outer, instance in zip(
+            self.instance_cluster_ids, self.instances
+        ):
+
+            def generate_file_substitutions(args):
+                cluster_id: int = args[-1]
+                instance_ips: List[str] = args[:-1]
+                idx = self.instance_cluster_ids.index(cluster_id)
+                my_ip = instance_ips[idx]
+
+                return {
+                    "config.sh": {
+                        "NODE_ID": str(cluster_id),
+                        "DEFAULT_LEADER_NODE_ID": str(self.instance_cluster_ids[0]),
+                        "MY_IP": my_ip,
+                        "JOIN_ADDRESS": ",".join(
+                            f"http://{ip}:4001" for ip in instance_ips if ip != my_ip
+                        ),
+                    }
+                }
+
+            self.remote_executions.append(
+                RemoteExecution(
+                    f"{resource_name}-remote-execution-{cluster_id_outer}",
+                    props=RemoteExecutionInputs(
+                        script_name="setup-scripts/rqlite",
+                        file_substitutions=pulumi.Output.all(
+                            *[i.private_ip for i in self.instances], cluster_id_outer
+                        ).apply(generate_file_substitutions),
+                        host=instance.private_ip,
+                        private_key=self.vpc.key.private_key_path,
+                        bastion=self.vpc.bastion.public_ip,
+                        shared_script_name="setup-scripts/shared",
                     ),
-                    host=instance.private_ip,
-                    private_key=self.vpc.key.private_key_path,
-                    bastion=self.vpc.bastion.public_ip,
-                    shared_script_name="setup-scripts/shared",
-                ),
+                )
             )
-            for cluster_id, instance in zip(
-                self.instance_cluster_ids,
-                self.instances,
-            )
-        ]
+
         """the remote executions required to bootstrap and maintain the cluster, in the
         same order as instances (which is not necessarily the same order as the subnets
         the instances are in)

@@ -417,7 +417,9 @@ def exec_simple(
     while from_stderr := stderr.read(4096):
         all_stderr.write(from_stderr)
 
-    return all_stdout.getvalue().decode('utf-8', errors='replace'), all_stderr.getvalue().decode('utf-8', errors='replace')
+    return all_stdout.getvalue().decode(
+        "utf-8", errors="replace"
+    ), all_stderr.getvalue().decode("utf-8", errors="replace")
 
 
 def hash_directory(dirpath: str) -> str:
@@ -523,6 +525,6 @@ def apply_substitutions(line: str, file_substitutions: Optional[Dict[str, str]] 
 
     return [
         SIMPLE_SUBSTITUTION_REGEX.sub(
-            lambda m: file_substitutions[m.group("key")], line
+            lambda m: file_substitutions.get(m.group("key"), ""), line
         )
     ]
