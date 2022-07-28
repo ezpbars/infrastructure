@@ -4,6 +4,7 @@ import tls
 from key import Key
 import webapp
 import rqlite
+import redis
 import reverse_proxy
 
 config = pulumi.Config()
@@ -17,11 +18,8 @@ if rqlite_id_offset is None:
 key = Key("key", "key.pub", "key.openssh")
 
 main_vpc = vpc.VirtualPrivateCloud("main_vpc", key)
-main_rqlite = rqlite.RqliteCluster(
-    "main_rqlite",
-    main_vpc,
-    id_offset=rqlite_id_offset
-)
+main_rqlite = rqlite.RqliteCluster("main_rqlite", main_vpc, id_offset=rqlite_id_offset)
+main_redis = redis.RedisCluster("main_redis", main_vpc)
 backend_rest = webapp.Webapp(
     "backend_rest",
     main_vpc,

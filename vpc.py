@@ -184,6 +184,17 @@ class VirtualPrivateCloud:
         )
         """The preferred arm64 ami"""
 
+        self.amazon_linux_amd64 = aws.ec2.get_ami(
+            most_recent=True,
+            filters=[
+                aws.ec2.GetAmiFilterArgs(name="name", values=["amzn2-ami-*"]),
+                aws.ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+                aws.ec2.GetAmiFilterArgs(name="architecture", values=["x86_64"]),
+            ],
+            owners=["137112412989"],
+        )
+        """The preferred amd64 ami"""
+
         self.amazon_linux_bleeding_arm64 = aws.ec2.get_ami(
             most_recent=True,
             filters=[
