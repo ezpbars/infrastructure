@@ -15,6 +15,8 @@ domain = config.require("domain")
 rqlite_id_offset = config.get_int("rqlite_id_offset")
 if rqlite_id_offset is None:
     rqlite_id_offset = 0
+deployment_secret = config.require_secret("deployment_secret")
+slack_web_errors_url = config.require_secret("slack_web_errors_url")
 
 key = Key("key", "key.pub", "key.openssh")
 
@@ -25,7 +27,11 @@ main_redis = redis.RedisCluster("main_redis", main_vpc)
 
 def make_standard_webapp_configuration(args) -> str:
     rqlite_ips: List[str] = args[: len(main_rqlite.instances)]
-    redis_ips: List[str] = args[len(rqlite_ips) :]
+    redis_ips: List[str] = args[
+        len(rqlite_ips) : len(rqlite_ips) + len(main_redis.instances)
+    ]
+    deploy_secret: str = args[-2]
+    web_errors_url: str = args[-1]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -34,6 +40,8 @@ def make_standard_webapp_configuration(args) -> str:
         [
             f'export RQLITE_IPS="{joined_rqlite_ips}"',
             f'export REDIS_IPS="{joined_redis_ips}"',
+            f'export DEPLOYMENT_SECRET="{deploy_secret}"',
+            f'export SLACK_WEB_ERRORS_URL="{web_errors_url}"',
         ]
     )
 
@@ -41,6 +49,7 @@ def make_standard_webapp_configuration(args) -> str:
 standard_configuration = pulumi.Output.all(
     *[instance.private_ip for instance in main_rqlite.instances],
     *[instance.private_ip for instance in main_redis.instances],
+    deployment_secret,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest = webapp.Webapp(
