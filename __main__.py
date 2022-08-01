@@ -50,6 +50,7 @@ standard_configuration = pulumi.Output.all(
     *[instance.private_ip for instance in main_rqlite.instances],
     *[instance.private_ip for instance in main_redis.instances],
     deployment_secret,
+    slack_web_errors_url,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest = webapp.Webapp(
