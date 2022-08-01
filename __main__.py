@@ -83,6 +83,16 @@ frontend = webapp.Webapp(
     key,
     configuration=standard_configuration,
 )
+jobs = webapp.Webapp(
+    "jobs",
+    main_vpc,
+    "ezpbars/jobs",
+    github_username,
+    github_pat,
+    main_vpc.bastion.public_ip,
+    key,
+    configuration=standard_configuration,
+)
 main_reverse_proxy = reverse_proxy.ReverseProxy(
     "main_reverse_proxy", main_vpc, key, backend_rest, backend_ws, frontend
 )
