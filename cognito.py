@@ -191,6 +191,9 @@ class Cognito:
 
         self.user_pool_domain: aws.cognito.UserPoolDomain = aws.cognito.UserPoolDomain(
             f"{resource_name}-user-pool-domain",
+            opts=pulumi.ResourceOptions(
+                depends_on=[self.tls.lb_v4_record, self.tls.certificate_validation, self.tls.load_balancer]
+            ),
             domain=auth_domain_without_trailing_dot,
             user_pool_id=self.user_pool.id,
             certificate_arn=self.auth_certificate.arn,
