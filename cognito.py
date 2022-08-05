@@ -6,6 +6,7 @@ through direct user sign-in.
 from typing import List
 import pulumi
 import pulumi_aws as aws
+from urllib.parse import urlencode
 from tls import TransportLayerSecurity
 
 
@@ -192,7 +193,11 @@ class Cognito:
         self.user_pool_domain: aws.cognito.UserPoolDomain = aws.cognito.UserPoolDomain(
             f"{resource_name}-user-pool-domain",
             opts=pulumi.ResourceOptions(
-                depends_on=[self.tls.lb_v4_record, self.tls.certificate_validation, self.tls.load_balancer]
+                depends_on=[
+                    self.tls.lb_v4_record,
+                    self.tls.certificate_validation,
+                    self.tls.load_balancer,
+                ]
             ),
             domain=auth_domain_without_trailing_dot,
             user_pool_id=self.user_pool.id,
@@ -202,7 +207,7 @@ class Cognito:
 
         self.auth_route53_record: aws.route53.Record = aws.route53.Record(
             f"{resource_name}-auth-route53-record",
-            name=self.user_pool.domain,
+            name=self.auth_domain,
             type="A",
             zone_id=self.tls.route53_zone.zone_id,
             aliases=[
@@ -219,3 +224,19 @@ class Cognito:
             lambda d: f"https://{d}/login"
         )
         """The url for the login page"""
+
+        self.code_login_url: pulumi.Output[str] = pulumi.Output.all(
+            self.login_url, self.user_pool_client.id
+        ).apply(
+            lambda args: f"{args[0]}?"
+            + urlencode(
+                {
+                    "response_type": "code",
+                    "client_id": args[1],
+                    "redirect_uri": domain_with_prefix,
+                }
+            )
+        )
+        """The URL to use for the code login"""
+
+        pulumi.export(f"{resource_name}-code-login-url", self.code_login_url)
