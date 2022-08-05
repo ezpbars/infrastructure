@@ -19,6 +19,8 @@ if rqlite_id_offset is None:
 deployment_secret = config.require_secret("deployment_secret")
 slack_web_errors_url = config.require_secret("slack_web_errors_url")
 slack_ops_url = config.require_secret("slack_ops_url")
+google_oidc_client_id = config.require("google_oidc_client_id")
+google_oidc_client_secret = config.require_secret("google_oidc_client_secret")
 
 key = Key("key", "key.pub", "key.openssh")
 
@@ -109,4 +111,9 @@ tls = TransportLayerSecurity(
     [subnet.id for subnet in main_vpc.public_subnets],
     [instance.id for instance in main_reverse_proxy.reverse_proxies],
 )
-cognito = Cognito("cognito", tls=tls)
+cognito = Cognito(
+    "cognito",
+    tls=tls,
+    google_oidc_client_id=google_oidc_client_id,
+    google_oidc_client_secret=google_oidc_client_secret,
+)

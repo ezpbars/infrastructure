@@ -15,7 +15,13 @@ class Cognito:
     seamless complex sign-in options
     """
 
-    def __init__(self, resource_name: str, tls: TransportLayerSecurity) -> None:
+    def __init__(
+        self,
+        resource_name: str,
+        tls: TransportLayerSecurity,
+        google_oidc_client_id: pulumi.Input[str],
+        google_oidc_client_secret: pulumi.Input[str],
+    ) -> None:
         """Creates the appropriate Amazon Cognito resources.
 
         Args:
@@ -23,12 +29,26 @@ class Cognito:
                 for resources created by this instance
             tls (TransportLayerSecurity): the transport layer security which
                 is used for configuring the subdomain for authorization
+            google_oidc_client_id (str): The client id for using google as an
+                identity provider
+            google_oidc_client_secret (str): The client secret for using google as
+                an identity provider
         """
         self.resource_name: str = resource_name
         """the prefix used for resources created by this instance"""
 
         self.tls: TransportLayerSecurity = tls
         """the main websites TLS settings"""
+
+        self.google_oidc_client_id: pulumi.Output[str] = pulumi.Output.from_input(
+            google_oidc_client_id
+        )
+        """the oauth client id to use google as an identity provider"""
+
+        self.google_oidc_client_secret: pulumi.Output[str] = pulumi.Output.from_input(
+            google_oidc_client_secret
+        )
+        """the oauth client secret to use google as an identity provider"""
 
         self.user_pool: aws.cognito.UserPool = aws.cognito.UserPool(
             f"{self.resource_name}-user-pool",
@@ -105,20 +125,43 @@ class Cognito:
         see https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html
         """
 
-        domain_with_prefix = f"https://{self.tls.domain.rstrip('.')}"
+        domain_with_prefix: pulumi.Output[str] = pulumi.Output.from_input(
+            self.tls.domain
+        ).apply(lambda d: f"https://{d.rstrip('.')}")
+        domain_with_prefix_and_trailing_slash: pulumi.Output[
+            str
+        ] = domain_with_prefix.apply(lambda d: f"{d}/")
+
+        self.google_identity_provider: aws.cognito.IdentityProvider = (
+            aws.cognito.IdentityProvider(
+                f"{resource_name}-google-identity-provider",
+                user_pool_id=self.user_pool.id,
+                provider_name="Google",
+                provider_type="Google",
+                provider_details={
+                    "authorize_scopes": "profile email openid",
+                    "client_id": self.google_oidc_client_id,
+                    "client_secret": self.google_oidc_client_secret,
+                },
+                attribute_mapping={"email": "email", "username": "sub", "name": "name"},
+            )
+        )
+        """the google identity provider to allow sign in with google"""
 
         self.user_pool_client: aws.cognito.UserPoolClient = aws.cognito.UserPoolClient(
             f"{self.resource_name}-user-pool-client",
             user_pool_id=self.user_pool.id,
             generate_secret=False,
-            callback_urls=[domain_with_prefix],
-            default_redirect_uri=domain_with_prefix,
+            callback_urls=[domain_with_prefix_and_trailing_slash],
+            default_redirect_uri=domain_with_prefix_and_trailing_slash,
             enable_token_revocation=True,
             prevent_user_existence_errors="ENABLED",
             allowed_oauth_flows_user_pool_client=True,
             allowed_oauth_flows=["code", "implicit"],
             allowed_oauth_scopes=[
                 "email",
+                "profile",
+                "phone",
                 "openid",
             ],
             read_attributes=[
@@ -128,7 +171,10 @@ class Cognito:
                 "given_name",
                 "family_name",
             ],
-            supported_identity_providers=["COGNITO"],
+            supported_identity_providers=[
+                "COGNITO",
+                self.google_identity_provider.provider_name,
+            ],
             name="ezpbars.com",
         )
         """The user pool client which the frontend redirects to for generating tokens"""
@@ -226,14 +272,16 @@ class Cognito:
         """The url for the login page"""
 
         self.token_login_url: pulumi.Output[str] = pulumi.Output.all(
-            self.login_url, self.user_pool_client.id
+            self.login_url,
+            self.user_pool_client.id,
+            domain_with_prefix_and_trailing_slash,
         ).apply(
             lambda args: f"{args[0]}?"
             + urlencode(
                 {
                     "response_type": "token",
                     "client_id": args[1],
-                    "redirect_uri": domain_with_prefix,
+                    "redirect_uri": args[2],
                 }
             )
         )
