@@ -113,10 +113,10 @@ class Cognito:
             callback_urls=[domain_with_prefix],
             default_redirect_uri=domain_with_prefix,
             enable_token_revocation=True,
-            prevent_user_existence_errors=False,
+            prevent_user_existence_errors="ENABLED",
             allowed_oauth_flows_user_pool_client=True,
-            allowed_oath_flows=["code", "implicit"],
-            allowed_oath_scopes=[
+            allowed_oauth_flows=["code", "implicit"],
+            allowed_oauth_scopes=[
                 "email",
                 "openid",
             ],
@@ -190,6 +190,7 @@ class Cognito:
         """
 
         self.user_pool_domain: aws.cognito.UserPoolDomain = aws.cognito.UserPoolDomain(
+            f"{resource_name}-user-pool-domain",
             domain=auth_domain_without_trailing_dot,
             user_pool_id=self.user_pool.id,
             certificate_arn=self.auth_certificate.arn,
