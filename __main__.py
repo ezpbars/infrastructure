@@ -1,12 +1,13 @@
 from typing import List
 import pulumi
 import vpc
-import tls
+from tls import TransportLayerSecurity
 from key import Key
 import webapp
 import rqlite
 import redis
 import reverse_proxy
+from cognito import Cognito
 
 config = pulumi.Config()
 github_username = config.require("github_username")
@@ -101,10 +102,11 @@ jobs = webapp.Webapp(
 main_reverse_proxy = reverse_proxy.ReverseProxy(
     "main_reverse_proxy", main_vpc, key, backend_rest, backend_ws, frontend
 )
-tls = tls.TransportLayerSecurity(
+tls = TransportLayerSecurity(
     "tls",
     domain,
     main_vpc.vpc.id,
     [subnet.id for subnet in main_vpc.public_subnets],
     [instance.id for instance in main_reverse_proxy.reverse_proxies],
 )
+cognito = Cognito("cognito", tls=tls)
