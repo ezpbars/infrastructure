@@ -225,18 +225,18 @@ class Cognito:
         )
         """The url for the login page"""
 
-        self.code_login_url: pulumi.Output[str] = pulumi.Output.all(
+        self.token_login_url: pulumi.Output[str] = pulumi.Output.all(
             self.login_url, self.user_pool_client.id
         ).apply(
             lambda args: f"{args[0]}?"
             + urlencode(
                 {
-                    "response_type": "code",
+                    "response_type": "token",
                     "client_id": args[1],
                     "redirect_uri": domain_with_prefix,
                 }
             )
         )
-        """The URL to use for the code login"""
+        """The URL to use for the token login"""
 
-        pulumi.export(f"{resource_name}-code-login-url", self.code_login_url)
+        pulumi.export(f"{resource_name}-token-login-url", self.token_login_url)
