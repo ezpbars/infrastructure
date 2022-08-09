@@ -40,6 +40,7 @@ def make_standard_webapp_configuration(args) -> str:
     ops_url: str = remaining[2]
     login_url: str = remaining[3]
     auth_domain: str = remaining[4]
+    auth_client_id: str = remaining[5]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -53,6 +54,7 @@ def make_standard_webapp_configuration(args) -> str:
             f'export SLACK_OPS_URL="{ops_url}"',
             f'export LOGIN_URL="{login_url}"',
             f'export AUTH_DOMAIN="{auth_domain}"',
+            f'export AUTH_CLIENT_ID="{auth_client_id}"',
         ]
     )
 
@@ -117,6 +119,7 @@ standard_configuration = pulumi.Output.all(
     slack_ops_url,
     cognito.token_login_url,
     cognito.auth_domain,
+    cognito.user_pool_client.name,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest.perform_remote_executions(standard_configuration)
