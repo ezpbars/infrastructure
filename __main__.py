@@ -38,6 +38,8 @@ def make_standard_webapp_configuration(args) -> str:
     deploy_secret: str = remaining[0]
     web_errors_url: str = remaining[1]
     ops_url: str = remaining[2]
+    login_url: str = remaining[3]
+    auth_domain: str = remaining[4]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -49,17 +51,11 @@ def make_standard_webapp_configuration(args) -> str:
             f'export DEPLOYMENT_SECRET="{deploy_secret}"',
             f'export SLACK_WEB_ERRORS_URL="{web_errors_url}"',
             f'export SLACK_OPS_URL="{ops_url}"',
+            f'export LOGIN_URL="{login_url}"',
+            f'export AUTH_DOMAIN="{auth_domain}"',
         ]
     )
 
-
-standard_configuration = pulumi.Output.all(
-    *[instance.private_ip for instance in main_rqlite.instances],
-    *[instance.private_ip for instance in main_redis.instances],
-    deployment_secret,
-    slack_web_errors_url,
-    slack_ops_url,
-).apply(make_standard_webapp_configuration)
 
 backend_rest = webapp.Webapp(
     "backend_rest",
@@ -69,7 +65,6 @@ backend_rest = webapp.Webapp(
     github_pat,
     main_vpc.bastion.public_ip,
     key,
-    configuration=standard_configuration,
 )
 backend_ws = webapp.Webapp(
     "backend_ws",
@@ -79,7 +74,6 @@ backend_ws = webapp.Webapp(
     github_pat,
     main_vpc.bastion.public_ip,
     key,
-    configuration=standard_configuration,
 )
 frontend = webapp.Webapp(
     "frontend",
@@ -89,7 +83,6 @@ frontend = webapp.Webapp(
     github_pat,
     main_vpc.bastion.public_ip,
     key,
-    configuration=standard_configuration,
 )
 jobs = webapp.Webapp(
     "jobs",
@@ -99,7 +92,6 @@ jobs = webapp.Webapp(
     github_pat,
     main_vpc.bastion.public_ip,
     key,
-    configuration=standard_configuration,
 )
 main_reverse_proxy = reverse_proxy.ReverseProxy(
     "main_reverse_proxy", main_vpc, key, backend_rest, backend_ws, frontend
@@ -117,3 +109,17 @@ cognito = Cognito(
     google_oidc_client_id=google_oidc_client_id,
     google_oidc_client_secret=google_oidc_client_secret,
 )
+standard_configuration = pulumi.Output.all(
+    *[instance.private_ip for instance in main_rqlite.instances],
+    *[instance.private_ip for instance in main_redis.instances],
+    deployment_secret,
+    slack_web_errors_url,
+    slack_ops_url,
+    cognito.token_login_url,
+    cognito.auth_domain,
+).apply(make_standard_webapp_configuration)
+
+backend_rest.perform_remote_executions(standard_configuration)
+backend_ws.perform_remote_executions(standard_configuration)
+frontend.perform_remote_executions(standard_configuration)
+jobs.perform_remote_executions(standard_configuration)
