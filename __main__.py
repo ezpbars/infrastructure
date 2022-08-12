@@ -41,6 +41,8 @@ def make_standard_webapp_configuration(args) -> str:
     login_url: str = remaining[3]
     auth_domain: str = remaining[4]
     auth_client_id: str = remaining[5]
+    public_kid_url: str = remaining[6]
+    expected_issuer: str = remaining[7]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -55,6 +57,8 @@ def make_standard_webapp_configuration(args) -> str:
             f'export LOGIN_URL="{login_url}"',
             f'export AUTH_DOMAIN="{auth_domain}"',
             f'export AUTH_CLIENT_ID="{auth_client_id}"',
+            f'export PUBLIC_KID_URL="{public_kid_url}"',
+            f'export EXPECTED_ISSUER="{expected_issuer}"',
         ]
     )
 
@@ -120,6 +124,8 @@ standard_configuration = pulumi.Output.all(
     cognito.token_login_url,
     cognito.auth_domain,
     cognito.user_pool_client.name,
+    cognito.public_kid_url,
+    cognito.expected_issuer,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest.perform_remote_executions(standard_configuration)
