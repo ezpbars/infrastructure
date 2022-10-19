@@ -43,6 +43,7 @@ def make_standard_webapp_configuration(args) -> str:
     auth_client_id: str = remaining[5]
     public_kid_url: str = remaining[6]
     expected_issuer: str = remaining[7]
+    domain: str = remaining[8]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -59,6 +60,9 @@ def make_standard_webapp_configuration(args) -> str:
             f'export AUTH_CLIENT_ID="{auth_client_id}"',
             f'export PUBLIC_KID_URL="{public_kid_url}"',
             f'export EXPECTED_ISSUER="{expected_issuer}"',
+            f'export ROOT_FRONTEND_URL="https://{domain}"',
+            f'export ROOT_BACKEND_URL="https://{domain}"',
+            f'export ROOT_WEBSOCKET_URL="wss://{domain}"',
         ]
     )
 
@@ -99,6 +103,15 @@ jobs = webapp.Webapp(
     main_vpc.bastion.public_ip,
     key,
 )
+itg_tests = webapp.Webapp(
+    "itg_tests",
+    main_vpc,
+    "ezpbars/itg_tests",
+    github_username,
+    github_pat,
+    main_vpc.bastion.public_ip,
+    key,
+)
 main_reverse_proxy = reverse_proxy.ReverseProxy(
     "main_reverse_proxy", main_vpc, key, backend_rest, backend_ws, frontend
 )
@@ -126,9 +139,11 @@ standard_configuration = pulumi.Output.all(
     cognito.user_pool_client.name,
     cognito.public_kid_url,
     cognito.expected_issuer,
+    domain,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest.perform_remote_executions(standard_configuration)
 backend_ws.perform_remote_executions(standard_configuration)
 frontend.perform_remote_executions(standard_configuration)
 jobs.perform_remote_executions(standard_configuration)
+itg_tests.perform_remote_executions(standard_configuration)
