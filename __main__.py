@@ -21,6 +21,7 @@ slack_web_errors_url = config.require_secret("slack_web_errors_url")
 slack_ops_url = config.require_secret("slack_ops_url")
 google_oidc_client_id = config.require("google_oidc_client_id")
 google_oidc_client_secret = config.require_secret("google_oidc_client_secret")
+example_user_sub = config.require("example_user_sub")
 
 key = Key("key", "key.pub", "key.openssh")
 
@@ -44,6 +45,7 @@ def make_standard_webapp_configuration(args) -> str:
     public_kid_url: str = remaining[6]
     expected_issuer: str = remaining[7]
     domain: str = remaining[8]
+    example_user_sub: str = remaining[9]
 
     joined_rqlite_ips = ",".join(rqlite_ips)
     joined_redis_ips = ",".join(redis_ips)
@@ -63,6 +65,7 @@ def make_standard_webapp_configuration(args) -> str:
             f'export ROOT_FRONTEND_URL="https://{domain}"',
             f'export ROOT_BACKEND_URL="https://{domain}"',
             f'export ROOT_WEBSOCKET_URL="wss://{domain}"',
+            f'export EXAMPLE_USER_SUB="{example_user_sub}"',
         ]
     )
 
@@ -140,6 +143,7 @@ standard_configuration = pulumi.Output.all(
     cognito.public_kid_url,
     cognito.expected_issuer,
     domain,
+    example_user_sub,
 ).apply(make_standard_webapp_configuration)
 
 backend_rest.perform_remote_executions(standard_configuration)

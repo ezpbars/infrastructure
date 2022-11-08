@@ -6,3 +6,5 @@ venv/
 __pycache__
 passphrase
 *.yaml
+dev.bat
+dev-*.bat
